@@ -1,0 +1,1 @@
+"$Env:VULKAN_SDK\Bin\glslangValidator.exe -V copy.comp -o copy.spv" | Invoke-Expression
