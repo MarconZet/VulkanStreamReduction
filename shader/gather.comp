@@ -1,0 +1,30 @@
+#version 450
+
+layout(local_size_x = 1024) in;
+
+layout(set = 0, binding = 0) readonly buffer InBuffer {
+    vec2[] in_buf;
+};
+
+layout(set = 0, binding = 1)  buffer OutBuffer {
+    vec2[] out_buf;
+};
+
+layout(set = 0, binding = 3) buffer AlgorithmData{
+    uint inputLenght;
+    uint outputLength;
+};
+
+layout(set = 0, binding = 2) buffer InBuf {
+    uint[] prefix_buf;
+};
+
+void main() {
+    uint global_xi = gl_GlobalInvocationID.x;
+
+    if (prefix_buf[global_xi] == prefix_buf[global_xi+1]){
+        out_buf[global_xi - prefix_buf[global_xi]] = in_buf[global_xi];
+    } else if (global_xi == gl_NumWorkGroups.x * 1024 -1){
+        out_buf[global_xi - prefix_buf[global_xi]] = in_buf[global_xi];
+    }
+}
