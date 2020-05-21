@@ -5,23 +5,24 @@
 #ifndef VULKANSTREAMREDUCE_FILTER_H
 #define VULKANSTREAMREDUCE_FILTER_H
 
+#include <utility>
+
 #include "vulkan/vulkan.h"
 
 #include "VulkanContext.h"
+#include "Shader.h"
+#include "Pipeline.h"
 
 class Filter {
 public:
 
-    Filter(uint32_t elementSize, uint32_t elementNumber, VulkanContext vulkanContext) : elementSize(elementSize), elementNumber(elementNumber) {
-        unpack(vulkanContext);
-        init();
-    }
+    Filter(uint32_t elementNumber, Shader shader, VulkanContext vulkanContext);
 
     void execute();
 
 private:
-    uint32_t elementSize;
     uint32_t elementNumber;
+    Shader shader;
 
     VkCommandBuffer commandBuffer;
 
@@ -30,10 +31,7 @@ private:
     VkBuffer out_buffer;
     VkDescriptorSet descriptorSet;
 
-    VkShaderModule shader_module;
-    VkDescriptorSetLayout descriptorSetLayout;
-    VkPipelineLayout pipelineLayout;
-    VkPipeline pipeline;
+    Pipeline pipelines[3];
 
     VkPhysicalDevice physicalDevice;
     VkDevice device;

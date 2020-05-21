@@ -6,6 +6,7 @@
 #define VULKANSTREAMREDUCE_COMMON_H
 
 #include <string>
+#include <stdexcept>
 
 #define THROW_ON_FAIL(result) if (VK_SUCCESS != (result)) { throw std::runtime_error("Vulkan error"); }
 

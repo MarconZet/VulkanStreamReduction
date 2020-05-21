@@ -17,7 +17,7 @@ layout(set = 0, binding = 1) readonly buffer InBuffer {
     vec2[] in_buf;
 };
 
-layout(set = 0, binding = 2)  buffer OutBuffer {
+layout(set = 0, binding = 2) buffer OutBuffer {
     uint[] out_buf;
 };
 
@@ -48,10 +48,10 @@ void main() {
     uint global_xi = gl_GlobalInvocationID.x;
 
     bool isInTriangle = false;
-    for(int i = 0; i<TRIANGLE_N; i++){
+    for (int i = 0; i<TRIANGLE_N; i++){
         isInTriangle = isInTriangle || is_inside(data_buf[i], in_buf[global_xi]);
 
-        if(subsubgroupAll(isInTriangle)){
+        if (subsubgroupAll(isInTriangle)){
             break;
         }
     }

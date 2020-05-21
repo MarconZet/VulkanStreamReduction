@@ -13,16 +13,17 @@ Added saving data for next step of algorithm
 
 layout(local_size_x = 1024) in;
 
+layout(set = 1, binding = 0) buffer AlgorithmData{
+    uint inputLenght;
+    uint outputLength;
+    uint elementSize;
+};
+
 // One workgroup processes workgroup size * N_ROWS elements.
 #define N_ROWS 16
 
-layout(set = 0, binding = 0) readonly buffer InBuf {
+layout(set = 0, binding = 0) buffer PrefixBuf{
     uint[] prefix_buf;
-};
-
-layout(set = 0, binding = 1) buffer AlgorithmData{
-    uint inputLenght;
-    uint outputLength;
 };
 
 // work_buf[0] is the tile id
@@ -129,6 +130,6 @@ void main() {
 
 
     if (gl_NumWorkGroups.x == my_tile + 1 && local_ix == 1023){
-        outputLength = inputLength - out_buf[inputLength - 1];
+        outputLength = inputLength - prefix_buf[inputLength - 1];
     }
 }

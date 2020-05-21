@@ -13,25 +13,20 @@
 #include "Filter.h"
 
 void Filter::init() {
-    std::ifstream shaderFile("copy.spv", std::ios::binary | std::ios::ate);
-    std::streamsize shaderSize = shaderFile.tellg();
-    shaderFile.seekg(0, std::ios::beg);
+    auto prefixShader = shader.getShader("prefix.spv"),
+    auto gatherShader = shader.getShader("gather.spv"),
 
-    std::vector<uint32_t> shader(shaderSize / 4);
-    if (!shaderFile.read(reinterpret_cast<char *>(shader.data()), shaderSize)) {
-        throw std::runtime_error("Failed to load shader");
-    }
-
-
-    VkShaderModuleCreateInfo shaderModuleCreateInfo = {
-            VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO,
-            nullptr,
-            0,
-            shader.size() * 4,
-            shader.data()
+    const std::vector<uint32_t> *shaders[4] = {
+            &shader.getScatterShader(),
+            &prefixShader,
+            &gatherShader,
+            &shader.getCopyShader()
     };
 
-    THROW_ON_FAIL(vkCreateShaderModule(device, &shaderModuleCreateInfo, nullptr, &shader_module))
+
+    for (int i = 0; i < 4; i++) {
+
+    }
 
     VkDescriptorSetLayoutBinding descriptorSetLayoutBindings[2] = {
             {
@@ -60,38 +55,7 @@ void Filter::init() {
 
     THROW_ON_FAIL(vkCreateDescriptorSetLayout(device, &descriptorSetLayoutCreateInfo, nullptr, &descriptorSetLayout))
 
-    VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo = {
-            VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
-            nullptr,
-            0,
-            1,
-            &descriptorSetLayout,
-            0,
-            nullptr
-    };
-
-    THROW_ON_FAIL(vkCreatePipelineLayout(device, &pipelineLayoutCreateInfo, nullptr, &pipelineLayout))
-
-    VkComputePipelineCreateInfo computePipelineCreateInfo = {
-            VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO,
-            nullptr,
-            0,
-            {
-                    VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
-                    nullptr,
-                    0,
-                    VK_SHADER_STAGE_COMPUTE_BIT,
-                    shader_module,
-                    "main",
-                    nullptr
-            },
-            pipelineLayout,
-            nullptr,
-            0
-    };
-
-    THROW_ON_FAIL(vkCreateComputePipelines(device, nullptr, 1, &computePipelineCreateInfo, nullptr, &pipeline))
-
+    //Memory Allocation
 
     VkPhysicalDeviceMemoryProperties properties;
 
@@ -126,7 +90,6 @@ void Filter::init() {
     THROW_ON_FAIL(vkAllocateMemory(device, &memoryAllocateInfo, nullptr, &memory))
 
 
-
     const VkBufferCreateInfo bufferCreateInfo = {
             VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
             nullptr,
@@ -146,6 +109,7 @@ void Filter::init() {
 
     THROW_ON_FAIL(vkBindBufferMemory(device, out_buffer, memory, bufferSize))
 
+    //Descriptor set allocation and updating
 
     VkDescriptorSetAllocateInfo descriptorSetAllocateInfo = {
             VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO,
@@ -198,6 +162,9 @@ void Filter::init() {
     };
 
     vkUpdateDescriptorSets(device, 2, writeDescriptorSet, 0, nullptr);
+
+
+    //Command buffer recording
 
 
     VkCommandBufferAllocateInfo commandBufferAllocateInfo = {
@@ -276,4 +243,10 @@ void Filter::unpack(VulkanContext context) {
     queue = context.getQueue();
     commandPool = context.getCommandPool();
     descriptorPool = context.getDescriptorPool();
+}
+
+Filter::Filter(uint32_t elementNumber, Shader shader, VulkanContext vulkanContext) : elementNumber(elementNumber),
+                                                                                     shader(std::move(shader)) {
+    unpack(vulkanContext);
+    init();
 }
