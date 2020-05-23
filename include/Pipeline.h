@@ -16,6 +16,10 @@ public:
 
     [[nodiscard]] VkPipeline getPipeline() const;
 
+    [[nodiscard]] const VkPipelineLayout getPipelineLayout() const;
+
+    [[nodiscard]] const VkDescriptorSet getDescriptorSet() const;
+
     virtual void createDescriptorSet(std::vector<VkBuffer> buffers, VkDescriptorPool descriptorPool) = 0;
 
 protected:

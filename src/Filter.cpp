@@ -90,7 +90,8 @@ void Filter::init() {
 
     stagingBuffer = createBuffer(src | dst, dataBufferSize, transferMemory, 0);
     additionalDataBuffer = createBuffer(dst, additionalData.size(), transferMemory, dataBufferSize);
-    algorithmDataBuffer = createBuffer(src | dst, algorithmDataBufferSize, transferMemory, dataBufferSize + additionalData.size());
+    algorithmDataBuffer = createBuffer(src | dst, algorithmDataBufferSize, transferMemory,
+                                       dataBufferSize + additionalData.size());
 
     //Descriptor set allocation
 
@@ -129,22 +130,79 @@ void Filter::init() {
 
     THROW_ON_FAIL(vkBeginCommandBuffer(commandBuffer, &commandBufferBeginInfo))
 
-    vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, pipeline);
+    const VkBufferCopy bufferCopy = {
+            0,
+            0,
+            VK_WHOLE_SIZE
+    };
+    vkCmdCopyBuffer(commandBuffer, stagingBuffer, inputBuffer, 1, &bufferCopy);
 
-    vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE,
-                            pipelineLayout, 0, 1, &descriptorSet, 0, nullptr);
+    const VkMemoryBarrier memoryBarrier = {
+            VK_STRUCTURE_TYPE_MEMORY_BARRIER,
+            nullptr,
+            VK_ACCESS_MEMORY_WRITE_BIT,
+            VK_ACCESS_MEMORY_READ_BIT
+    };
 
-    vkCmdDispatch(commandBuffer, dataBufferSize / sizeof(int32_t), 1, 1);
+    vkCmdPipelineBarrier(
+            commandBuffer,
+            VK_PIPELINE_STAGE_FLAG_BITS_MAX_ENUM,
+            VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+            0,
+            1,
+            &memoryBarrier,
+            0,
+            nullptr,
+            0,
+            nullptr
+    );
+
+    auto set = scatterPipeline.getDescriptorSet();
+    vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, scatterPipeline.getPipeline());
+    vkCmdBindDescriptorSets(
+            commandBuffer,
+            VK_PIPELINE_BIND_POINT_COMPUTE,
+            scatterPipeline.getPipelineLayout(),
+            0,
+            1,
+            &set,
+            0,
+            nullptr
+    );
+    vkCmdDispatch(commandBuffer, elementNumber / 1024, 1, 1);
+
+    set = prefixPipeline.getDescriptorSet();
+    vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, prefixPipeline.getPipeline());
+    vkCmdBindDescriptorSets(
+            commandBuffer,
+            VK_PIPELINE_BIND_POINT_COMPUTE,
+            prefixPipeline.getPipelineLayout(),
+            0,
+            1,
+            &set,
+            0,
+            nullptr
+    );
+    vkCmdDispatch(commandBuffer, elementNumber / 16 * 1024, 1, 1);
+
+    set = gatherPipeline.getDescriptorSet();
+    vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, gatherPipeline.getPipeline());
+    vkCmdBindDescriptorSets(
+            commandBuffer,
+            VK_PIPELINE_BIND_POINT_COMPUTE,
+            gatherPipeline.getPipelineLayout(),
+            0,
+            1,
+            &set,
+            0,
+            nullptr
+    );
+    vkCmdDispatch(commandBuffer, elementNumber / 1024, 1, 1);
 
     THROW_ON_FAIL(vkEndCommandBuffer(commandBuffer))
 }
 
 void Filter::execute() {
-    const int32_t bufferLength = elementNumber;
-
-    const uint32_t bufferSize = elementSize * bufferLength;
-
-    const VkDeviceSize memorySize = bufferSize * 2;
 
     int32_t *payload;
     THROW_ON_FAIL(vkMapMemory(device, memory, 0, memorySize, 0, (void **) &payload))

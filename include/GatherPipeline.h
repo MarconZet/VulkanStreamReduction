@@ -10,7 +10,7 @@
 
 #include <utility>
 
-class GatherPipeline : Pipeline {
+class GatherPipeline : public Pipeline {
 public:
 
     void createDescriptorSet(std::vector<VkBuffer> buffers, VkDescriptorPool descriptorPool) override;

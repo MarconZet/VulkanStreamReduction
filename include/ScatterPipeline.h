@@ -8,7 +8,7 @@
 
 #include "Pipeline.h"
 
-class ScatterPipeline : Pipeline {
+class ScatterPipeline : public Pipeline {
 public:
     ScatterPipeline(std::vector<uint32_t> shader, VkDevice device)
             : Pipeline(std::move(shader), device) {}

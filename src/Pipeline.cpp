@@ -71,3 +71,11 @@ VkPipeline Pipeline::createPipeline() {
 VkPipeline Pipeline::getPipeline() const {
     return pipeline;
 }
+
+VkPipelineLayout Pipeline::getPipelineLayout() const {
+    return pipelineLayout;
+}
+
+VkDescriptorSet Pipeline::getDescriptorSet() const {
+    return descriptorSet;
+}

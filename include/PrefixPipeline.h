@@ -8,7 +8,7 @@
 
 #include "Pipeline.h"
 
-class PrefixPipeline : Pipeline {
+class PrefixPipeline : public Pipeline {
 public:
     PrefixPipeline(std::vector<uint32_t> shader , VkDevice device)
     : Pipeline(std::move(shader), device){}
