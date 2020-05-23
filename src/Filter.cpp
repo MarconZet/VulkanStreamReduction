@@ -9,134 +9,102 @@
 
 #include "vulkan/vulkan.h"
 
-#include "common.h"
 #include "Filter.h"
 
+#include "common.h"
+#include <ScatterPipeline.h>
+#include <GatherPipeline.h>
+#include <PrefixPipeline.h>
+
 void Filter::init() {
-    auto prefixShader = shader.getShader("prefix.spv"),
-    auto gatherShader = shader.getShader("gather.spv"),
+    auto prefixShader = shader.getShader("prefix.spv");
+    auto gatherShader = shader.getShader("gather.spv");
+    auto scatterShader = shader.getScatterShader();
 
-    const std::vector<uint32_t> *shaders[4] = {
-            &shader.getScatterShader(),
-            &prefixShader,
-            &gatherShader,
-            &shader.getCopyShader()
-    };
+    scatterPipeline = ScatterPipeline(scatterShader, device);
+    prefixPipeline = PrefixPipeline(gatherShader, device);
+    gatherPipeline = GatherPipeline(gatherShader, device);
 
-
-    for (int i = 0; i < 4; i++) {
-
-    }
 
 
 
     //Memory Allocation
+    const std::vector<uint8_t> additionalData = shader.getAdditionalData();
 
     VkPhysicalDeviceMemoryProperties properties;
 
     vkGetPhysicalDeviceMemoryProperties(physicalDevice, &properties);
 
-    const int32_t bufferLength = elementNumber;
+    const VkDeviceSize dataBufferSize = shader.getElementSize() * elementNumber;
+    const VkDeviceSize prefixBufferSize = elementNumber * 4;
+    const VkDeviceSize algorithmDataBufferSize = 3 * 4;
 
-    const uint32_t bufferSize = elementSize * bufferLength;
+    const VkDeviceSize transferMemorySize = dataBufferSize + algorithmDataBufferSize + additionalData.size();
+    const VkDeviceSize localMemorySize = 2 * dataBufferSize + prefixBufferSize;
 
-    const VkDeviceSize memorySize = bufferSize * 2;
-
-    uint32_t memoryTypeIndex = VK_MAX_MEMORY_TYPES;
+    uint32_t transferMemoryIndex = VK_MAX_MEMORY_TYPES;
+    uint32_t localMemoryIndex = VK_MAX_MEMORY_TYPES;
 
     for (uint32_t k = 0; k < properties.memoryTypeCount; k++) {
         if ((VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT & properties.memoryTypes[k].propertyFlags) &&
             (VK_MEMORY_PROPERTY_HOST_COHERENT_BIT & properties.memoryTypes[k].propertyFlags) &&
-            (memorySize < properties.memoryHeaps[properties.memoryTypes[k].heapIndex].size)) {
-            memoryTypeIndex = k;
+            (transferMemorySize < properties.memoryHeaps[properties.memoryTypes[k].heapIndex].size)) {
+            transferMemoryIndex = k;
+            break;
+        }
+        if ((VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT & properties.memoryTypes[k].propertyFlags) &&
+            (localMemorySize < properties.memoryHeaps[properties.memoryTypes[k].heapIndex].size)) {
+            localMemoryIndex = k;
             break;
         }
     }
 
-    THROW_ON_FAIL(memoryTypeIndex == VK_MAX_MEMORY_TYPES ? VK_ERROR_OUT_OF_HOST_MEMORY : VK_SUCCESS)
+    if (transferMemoryIndex == VK_MAX_MEMORY_TYPES || localMemoryIndex == VK_MAX_MEMORY_TYPES) {
+        throw std::runtime_error("Failed to find suitable memory types\n");
+    }
 
-    const VkMemoryAllocateInfo memoryAllocateInfo = {
-            VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO,
-            nullptr,
-            memorySize,
-            memoryTypeIndex
-    };
-
-    THROW_ON_FAIL(vkAllocateMemory(device, &memoryAllocateInfo, nullptr, &memory))
-
-
-    const VkBufferCreateInfo bufferCreateInfo = {
-            VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
-            nullptr,
-            0,
-            bufferSize,
-            VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
-            VK_SHARING_MODE_EXCLUSIVE,
-            1,
-            &computeFamilyIndex
-    };
-
-    THROW_ON_FAIL(vkCreateBuffer(device, &bufferCreateInfo, nullptr, &in_buffer))
-
-    THROW_ON_FAIL(vkBindBufferMemory(device, in_buffer, memory, 0))
-
-    THROW_ON_FAIL(vkCreateBuffer(device, &bufferCreateInfo, nullptr, &out_buffer))
-
-    THROW_ON_FAIL(vkBindBufferMemory(device, out_buffer, memory, bufferSize))
-
-    //Descriptor set allocation and updating
-
-    VkDescriptorSetAllocateInfo descriptorSetAllocateInfo = {
-            VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO,
-            nullptr,
-            descriptorPool,
-            1,
-            &descriptorSetLayout
-    };
-
-
-    THROW_ON_FAIL(vkAllocateDescriptorSets(device, &descriptorSetAllocateInfo, &descriptorSet))
-
-    VkDescriptorBufferInfo in_descriptorBufferInfo = {
-            in_buffer,
-            0,
-            VK_WHOLE_SIZE
-    };
-
-    VkDescriptorBufferInfo out_descriptorBufferInfo = {
-            out_buffer,
-            0,
-            VK_WHOLE_SIZE
-    };
-
-    VkWriteDescriptorSet writeDescriptorSet[2] = {
+    const VkMemoryAllocateInfo memoryAllocateInfo[2] = {
             {
-                    VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+                    VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO,
                     nullptr,
-                    descriptorSet,
-                    0,
-                    0,
-                    1,
-                    VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
-                    nullptr,
-                    &in_descriptorBufferInfo,
-                    nullptr
+                    transferMemorySize,
+                    transferMemoryIndex
             },
             {
-                    VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+                    VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO,
                     nullptr,
-                    descriptorSet,
-                    1,
-                    0,
-                    1,
-                    VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
-                    nullptr,
-                    &out_descriptorBufferInfo,
-                    nullptr
+                    localMemorySize,
+                    localMemoryIndex
             }
     };
 
-    vkUpdateDescriptorSets(device, 2, writeDescriptorSet, 0, nullptr);
+    THROW_ON_FAIL(vkAllocateMemory(device, &memoryAllocateInfo[0], nullptr, &transferMemory))
+    THROW_ON_FAIL(vkAllocateMemory(device, &memoryAllocateInfo[1], nullptr, &localMemory))
+
+    const auto dst = VK_BUFFER_USAGE_TRANSFER_DST_BIT;
+    const auto src = VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
+
+    inputBuffer = createBuffer(dst, dataBufferSize, localMemory, 0);
+    outputBuffer = createBuffer(src, dataBufferSize, localMemory, dataBufferSize);
+    prefixBuffer = createBuffer(0, prefixBufferSize, localMemory, 2 * dataBufferSize);
+
+    stagingBuffer = createBuffer(src | dst, dataBufferSize, transferMemory, 0);
+    additionalDataBuffer = createBuffer(dst, additionalData.size(), transferMemory, dataBufferSize);
+    algorithmDataBuffer = createBuffer(src | dst, algorithmDataBufferSize, transferMemory, dataBufferSize + additionalData.size());
+
+    //Descriptor set allocation
+
+    std::vector<VkBuffer> buffers(6);
+    buffers.push_back(inputBuffer);
+    buffers.push_back(outputBuffer);
+    buffers.push_back(prefixBuffer);
+    buffers.push_back(stagingBuffer);
+    buffers.push_back(additionalDataBuffer);
+    buffers.push_back(algorithmDataBuffer);
+
+    scatterPipeline.createDescriptorSet(buffers, descriptorPool);
+    gatherPipeline.createDescriptorSet(buffers, descriptorPool);
+    prefixPipeline.createDescriptorSet(buffers, descriptorPool);
 
 
     //Command buffer recording
@@ -166,7 +134,7 @@ void Filter::init() {
     vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE,
                             pipelineLayout, 0, 1, &descriptorSet, 0, nullptr);
 
-    vkCmdDispatch(commandBuffer, bufferSize / sizeof(int32_t), 1, 1);
+    vkCmdDispatch(commandBuffer, dataBufferSize / sizeof(int32_t), 1, 1);
 
     THROW_ON_FAIL(vkEndCommandBuffer(commandBuffer))
 }
@@ -224,4 +192,26 @@ Filter::Filter(uint32_t elementNumber, Shader shader, VulkanContext vulkanContex
                                                                                      shader(std::move(shader)) {
     unpack(vulkanContext);
     init();
+}
+
+VkBuffer
+Filter::createBuffer(VkFlags flags, VkDeviceSize size, VkDeviceMemory memory, VkDeviceSize memoryOffset) {
+    VkBuffer buffer;
+
+    const VkBufferCreateInfo buffersCreateInfo = {
+            VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
+            nullptr,
+            0,
+            size,
+            VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | flags,
+            VK_SHARING_MODE_EXCLUSIVE,
+            1,
+            &computeFamilyIndex
+    };
+
+    THROW_ON_FAIL(vkCreateBuffer(device, &buffersCreateInfo, nullptr, &buffer))
+
+    THROW_ON_FAIL(vkBindBufferMemory(device, buffer, memory, memoryOffset))
+
+    return buffer;
 }

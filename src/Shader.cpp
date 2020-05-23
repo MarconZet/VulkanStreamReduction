@@ -8,9 +8,8 @@
 
 #include "Shader.h"
 
-Shader::Shader(uint32_t elementSize, std::vector<uint32_t> scatterShader,
-               std::vector<uint32_t> copyShader) : elementSize(elementSize), scatterShader(std::move(scatterShader)),
-                                                          copyShader(std::move(copyShader)) {}
+Shader::Shader(uint32_t elementSize, std::vector<uint32_t> scatterShader, std::vector<uint8_t> data)
+               : elementSize(elementSize), scatterShader(std::move(scatterShader)), additionalData(std::move(data)) {}
 
 uint32_t Shader::getElementSize() const {
     return elementSize;
@@ -18,10 +17,6 @@ uint32_t Shader::getElementSize() const {
 
 const std::vector<uint32_t> &Shader::getScatterShader() const {
     return scatterShader;
-}
-
-const std::vector<uint32_t> &Shader::getCopyShader() const {
-    return copyShader;
 }
 
 std::vector<uint32_t> Shader::getShader(const std::string& name){
@@ -37,8 +32,15 @@ std::vector<uint32_t> Shader::getShader(const std::string& name){
     return shader;
 }
 
-Shader::Shader(uint32_t elementSize, const std::string& scatterName, const std::string& copyName) : elementSize(elementSize){
+Shader::Shader(uint32_t elementSize, const std::string& scatterName, std::vector<uint8_t> data)
+: elementSize(elementSize), additionalData(std::move(data)){
     scatterShader = getShader(scatterName);
-    copyShader = getShader(copyName);
+}
 
+void Shader::setData(const std::vector<uint8_t> &data) {
+    Shader::additionalData = data;
+}
+
+const std::vector<uint8_t> &Shader::getAdditionalData() const {
+    return additionalData;
 }

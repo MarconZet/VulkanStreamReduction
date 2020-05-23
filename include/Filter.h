@@ -12,6 +12,9 @@
 #include "VulkanContext.h"
 #include "Shader.h"
 #include "Pipeline.h"
+#include <ScatterPipeline.h>
+#include <GatherPipeline.h>
+#include <PrefixPipeline.h>
 
 class Filter {
 public:
@@ -26,12 +29,20 @@ private:
 
     VkCommandBuffer commandBuffer;
 
-    VkDeviceMemory memory;
-    VkBuffer in_buffer;
-    VkBuffer out_buffer;
-    VkDescriptorSet descriptorSet;
+    VkBuffer inputBuffer;
+    VkBuffer outputBuffer;
+    VkBuffer prefixBuffer;
 
-    Pipeline pipelines[3];
+    VkBuffer stagingBuffer;
+    VkBuffer additionalDataBuffer;
+    VkBuffer algorithmDataBuffer;
+
+    VkDeviceMemory localMemory;
+    VkDeviceMemory transferMemory;
+
+    ScatterPipeline scatterPipeline;
+    GatherPipeline gatherPipeline;
+    PrefixPipeline prefixPipeline;
 
     VkPhysicalDevice physicalDevice;
     VkDevice device;
@@ -41,6 +52,7 @@ private:
     VkDescriptorPool descriptorPool;
 
     void unpack(VulkanContext context);
+    VkBuffer createBuffer(VkFlags flags, VkDeviceSize size, VkDeviceMemory memory, VkDeviceSize memoryOffset);
 
     void init();
 };

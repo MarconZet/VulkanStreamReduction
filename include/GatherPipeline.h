@@ -8,8 +8,18 @@
 
 #include "Pipeline.h"
 
+#include <utility>
+
 class GatherPipeline : Pipeline {
-    VkDescriptorSetLayout createDescriptorSetLayout();
+public:
+
+    void createDescriptorSet(std::vector<VkBuffer> buffers, VkDescriptorPool descriptorPool) override;
+
+    GatherPipeline(std::vector<uint32_t> shader, VkDevice device)
+            : Pipeline(std::move(shader), device) {}
+
+protected:
+    VkDescriptorSetLayout createDescriptorSetLayout() override;
 };
 
 

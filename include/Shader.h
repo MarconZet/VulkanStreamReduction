@@ -12,9 +12,9 @@
 
 class Shader {
 public:
-    Shader(uint32_t elementSize, std::vector<uint32_t> scatterShader, std::vector<uint32_t> copyShader);
+    Shader(uint32_t elementSize, std::vector<uint32_t> scatterShader, std::vector<uint8_t> data);
 
-    Shader(uint32_t elementSize, const std::string& scatterName, const std::string& copyName);
+    Shader(uint32_t elementSize, const std::string& scatterName, std::vector<uint8_t> data);
 
     std::vector<uint32_t> getShader(const std::string& name);
 
@@ -22,12 +22,14 @@ public:
 
     [[nodiscard]] const std::vector<uint32_t> &getScatterShader() const;
 
-    [[nodiscard]] const std::vector<uint32_t> &getCopyShader() const;
+    void setData(const std::vector<uint8_t> &data);
+
+    [[nodiscard]] const std::vector<uint8_t> &getAdditionalData() const;
 
 private:
     uint32_t elementSize;
     std::vector<uint32_t> scatterShader;
-    std::vector<uint32_t> copyShader;
+    std::vector<uint8_t> additionalData;
 };
 
 

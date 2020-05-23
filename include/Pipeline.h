@@ -12,18 +12,21 @@
 
 class Pipeline {
 public:
-    Pipeline(std::vector<uint32_t> shader , VkDevice device) : shader(std::move(shader)) , device(device) {}
-
     void create();
 
     [[nodiscard]] VkPipeline getPipeline() const;
 
+    virtual void createDescriptorSet(std::vector<VkBuffer> buffers, VkDescriptorPool descriptorPool) = 0;
+
 protected:
+    VkDescriptorSet descriptorSet;
     VkShaderModule shaderModule;
     VkDescriptorSetLayout descriptorSetLayout;
     VkPipelineLayout pipelineLayout;
     VkPipeline pipeline;
     VkDevice device;
+
+    Pipeline(std::vector<uint32_t> shader , VkDevice device) : shader(std::move(shader)) , device(device) {}
 
     virtual VkDescriptorSetLayout createDescriptorSetLayout() = 0;
 

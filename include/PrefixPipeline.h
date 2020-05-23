@@ -9,7 +9,14 @@
 #include "Pipeline.h"
 
 class PrefixPipeline : Pipeline {
-    VkDescriptorSetLayout createDescriptorSetLayout();
+public:
+    PrefixPipeline(std::vector<uint32_t> shader , VkDevice device)
+    : Pipeline(std::move(shader), device){}
+
+    void createDescriptorSet(std::vector<VkBuffer> buffers, VkDescriptorPool descriptorPool) override;
+
+protected:
+    VkDescriptorSetLayout createDescriptorSetLayout() override;
 };
 
 
