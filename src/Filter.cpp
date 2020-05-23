@@ -124,7 +124,7 @@ void Filter::init() {
     VkCommandBufferBeginInfo commandBufferBeginInfo = {
             VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
             nullptr,
-            VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT,
+            0,
             nullptr
     };
 
@@ -200,6 +200,38 @@ void Filter::init() {
     vkCmdDispatch(commandBuffer, elementNumber / 1024, 1, 1);
 
     THROW_ON_FAIL(vkEndCommandBuffer(commandBuffer))
+
+
+    void * pointer;
+    THROW_ON_FAIL(vkMapMemory(device, transferMemory, dataBufferSize, additionalData.size(), 0, (void **) &pointer))
+    memcpy(pointer, additionalData.data(), additionalData.size());
+    vkUnmapMemory(device, transferMemory);
+
+    VkCommandBuffer copyCommandBuffer;
+    THROW_ON_FAIL(vkAllocateCommandBuffers(device, &commandBufferAllocateInfo, &copyCommandBuffer))
+    THROW_ON_FAIL(vkBeginCommandBuffer(copyCommandBuffer, &commandBufferBeginInfo))
+    const VkBufferCopy additionalDataCopy = {
+            0,
+            0,
+            additionalData.size()
+    };
+    vkCmdCopyBuffer(copyCommandBuffer, stagingBuffer, additionalDataBuffer, 1, &additionalDataCopy);
+    THROW_ON_FAIL(vkEndCommandBuffer(copyCommandBuffer))
+
+    VkSubmitInfo submitInfo = {
+            VK_STRUCTURE_TYPE_SUBMIT_INFO,
+            nullptr,
+            0,
+            nullptr,
+            nullptr,
+            1,
+            &copyCommandBuffer,
+            0,
+            nullptr
+    };
+
+    THROW_ON_FAIL(vkQueueSubmit(queue, 1, &submitInfo, nullptr))
+    THROW_ON_FAIL(vkQueueWaitIdle(queue))
 }
 
 void Filter::execute() {
