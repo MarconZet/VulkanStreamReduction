@@ -14,7 +14,7 @@ layout(set = 0, binding = 2) readonly buffer PrefixBuffer {
     uint[] prefixArray;
 };
 
-layout(set = 1, binding = 0) readonly buffer AlgorithmData{
+layout(set = 0, binding = 3) readonly buffer AlgorithmData{
     uint inputLenght;
     uint outputLength;
     uint elementSize;

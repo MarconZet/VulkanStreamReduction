@@ -11,7 +11,7 @@
 #include "common.h"
 #include "Pipeline.h"
 
-Pipeline::Pipeline(std::vector<uint32_t> shader , VkDevice device) : shader(std::move(shader)) , device(device) {
+void Pipeline::create(){
     shaderModule = createShaderModule();
     descriptorSetLayout = createDescriptorSetLayout();
     pipelineLayout = createPipelineLayout();
@@ -68,6 +68,6 @@ VkPipeline Pipeline::createPipeline() {
     return pipeline;
 }
 
-const VkPipeline_T *Pipeline::getPipeline() const {
+VkPipeline Pipeline::getPipeline() const {
     return pipeline;
 }

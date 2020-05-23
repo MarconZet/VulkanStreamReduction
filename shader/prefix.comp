@@ -13,7 +13,7 @@ Added saving data for next step of algorithm
 
 layout(local_size_x = 1024) in;
 
-layout(set = 1, binding = 0) buffer AlgorithmData{
+layout(set = 0, binding = 2) buffer AlgorithmData{
     uint inputLenght;
     uint outputLength;
     uint elementSize;
