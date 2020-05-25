@@ -21,7 +21,7 @@ public:
 
     Filter(uint32_t elementNumber, Shader shader, VulkanContext vulkanContext);
 
-    void execute();
+    void execute(const std::vector<uint8_t>& data);
 
 private:
     uint32_t elementNumber;
@@ -53,7 +53,7 @@ private:
 
     void unpack(VulkanContext context);
     VkBuffer createBuffer(VkFlags flags, VkDeviceSize size, VkDeviceMemory memory, VkDeviceSize memoryOffset);
-
+    void copyCommandBuffer(VkBuffer dst, VkBuffer src, VkDeviceSize size);
     void init();
 };
 

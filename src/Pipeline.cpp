@@ -79,3 +79,5 @@ VkPipelineLayout Pipeline::getPipelineLayout() const {
 VkDescriptorSet Pipeline::getDescriptorSet() const {
     return descriptorSet;
 }
+
+Pipeline::Pipeline() {}

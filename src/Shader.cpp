@@ -35,6 +35,9 @@ std::vector<uint32_t> Shader::getShader(const std::string& name){
 Shader::Shader(uint32_t elementSize, const std::string& scatterName, std::vector<uint8_t> data)
 : elementSize(elementSize), additionalData(std::move(data)){
     scatterShader = getShader(scatterName);
+    if(elementSize % 4 != 0){
+        throw std::invalid_argument("Element size must be a multiplicative of 4\n");
+    }
 }
 
 void Shader::setData(const std::vector<uint8_t> &data) {

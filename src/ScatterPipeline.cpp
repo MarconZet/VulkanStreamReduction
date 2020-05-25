@@ -116,3 +116,5 @@ void ScatterPipeline::createDescriptorSet(std::vector<VkBuffer> buffers, VkDescr
 
     vkUpdateDescriptorSets(device, 3, writeDescriptorSet, 0, nullptr);
 }
+
+ScatterPipeline::ScatterPipeline() {}

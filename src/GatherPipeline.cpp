@@ -140,3 +140,5 @@ void GatherPipeline::createDescriptorSet(std::vector<VkBuffer> buffers, VkDescri
 
 
 }
+
+GatherPipeline::GatherPipeline() {}

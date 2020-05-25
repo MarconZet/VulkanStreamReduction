@@ -90,7 +90,7 @@ void Filter::init() {
 
     stagingBuffer = createBuffer(src | dst, dataBufferSize, transferMemory, 0);
     additionalDataBuffer = createBuffer(dst, additionalData.size(), transferMemory, dataBufferSize);
-    algorithmDataBuffer = createBuffer(src | dst, algorithmDataBufferSize, transferMemory,
+    algorithmDataBuffer = createBuffer(0, algorithmDataBufferSize, transferMemory,
                                        dataBufferSize + additionalData.size());
 
     //Descriptor set allocation
@@ -203,7 +203,7 @@ void Filter::init() {
 
 
     void * pointer;
-    THROW_ON_FAIL(vkMapMemory(device, transferMemory, dataBufferSize, additionalData.size(), 0, (void **) &pointer))
+    THROW_ON_FAIL(vkMapMemory(device, transferMemory, dataBufferSize, additionalData.size(), 0, &pointer))
     memcpy(pointer, additionalData.data(), additionalData.size());
     vkUnmapMemory(device, transferMemory);
 
@@ -234,16 +234,23 @@ void Filter::init() {
     THROW_ON_FAIL(vkQueueWaitIdle(queue))
 }
 
-void Filter::execute() {
+void Filter::execute(const std::vector<uint8_t>& data) {
+    uint32_t dataBufferSize = shader.getElementSize() * elementNumber;
 
-    int32_t *payload;
-    THROW_ON_FAIL(vkMapMemory(device, memory, 0, memorySize, 0, (void **) &payload))
+    if(data.size() != dataBufferSize)
+        throw std::invalid_argument("Invalid number of data");
 
-    for (uint32_t k = 1; k < memorySize / elementSize; k++) {
-        payload[k] = rand();
-    }
+    void *pointer;
+    THROW_ON_FAIL(vkMapMemory(device, transferMemory, 0, dataBufferSize, 0, &pointer))
+    memcpy(pointer, data.data(), data.size());
+    vkUnmapMemory(device, transferMemory);
 
-    vkUnmapMemory(device, memory);
+    uint32_t *algorithmDataPointer;
+    THROW_ON_FAIL(vkMapMemory(device, transferMemory, dataBufferSize + shader.getAdditionalData().size(), 3 * 4, 0,(void **) &algorithmDataPointer))
+    algorithmDataPointer[0] = elementNumber;
+    algorithmDataPointer[1] = 0;
+    algorithmDataPointer[2] = shader.getElementSize()/4;
+    vkUnmapMemory(device, transferMemory);
 
 
     VkSubmitInfo submitInfo = {
@@ -257,16 +264,19 @@ void Filter::execute() {
             0,
             nullptr
     };
-
     THROW_ON_FAIL(vkQueueSubmit(queue, 1, &submitInfo, nullptr))
-
     THROW_ON_FAIL(vkQueueWaitIdle(queue))
 
-    THROW_ON_FAIL(vkMapMemory(device, memory, 0, memorySize, 0, (void **) &payload))
 
-    for (uint32_t k = 0, e = bufferSize / sizeof(int32_t); k < e; k++) {
-        THROW_ON_FAIL(payload[k + e] == payload[k] ? VK_SUCCESS : VK_ERROR_OUT_OF_HOST_MEMORY)
-    }
+    THROW_ON_FAIL(vkMapMemory(device, transferMemory, dataBufferSize + shader.getAdditionalData().size(), 3 * 4, 0,(void **) &algorithmDataPointer))
+    uint32_t outputLength = algorithmDataPointer[1];
+    vkUnmapMemory(device, transferMemory);
+
+    copyCommandBuffer(stagingBuffer, outputBuffer, outputLength);
+
+    THROW_ON_FAIL(vkMapMemory(device, transferMemory, 0, outputLength*shader.getElementSize(), 0, &pointer));
+    
+    vkUnmapMemory(device, transferMemory);
 }
 
 void Filter::unpack(VulkanContext context) {
@@ -278,8 +288,10 @@ void Filter::unpack(VulkanContext context) {
     descriptorPool = context.getDescriptorPool();
 }
 
-Filter::Filter(uint32_t elementNumber, Shader shader, VulkanContext vulkanContext) : elementNumber(elementNumber),
-                                                                                     shader(std::move(shader)) {
+Filter::Filter(uint32_t elementNumber, Shader shader, VulkanContext vulkanContext)
+: elementNumber(elementNumber), shader(std::move(shader)) {
+    if(elementNumber % 16 * 1024 != 0)
+        throw std::invalid_argument("Invalid number of elements");
     unpack(vulkanContext);
     init();
 }
@@ -304,4 +316,47 @@ Filter::createBuffer(VkFlags flags, VkDeviceSize size, VkDeviceMemory memory, Vk
     THROW_ON_FAIL(vkBindBufferMemory(device, buffer, memory, memoryOffset))
 
     return buffer;
+}
+
+void Filter::copyCommandBuffer(VkBuffer dst, VkBuffer src, VkDeviceSize size) {
+    const VkCommandBufferAllocateInfo commandBufferAllocateInfo = {
+            VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
+            nullptr,
+            commandPool,
+            VK_COMMAND_BUFFER_LEVEL_PRIMARY,
+            1
+    };
+
+    const VkCommandBufferBeginInfo commandBufferBeginInfo = {
+            VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
+            nullptr,
+            VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT,
+            nullptr
+    };
+
+    VkCommandBuffer copyCommandBuffer;
+    THROW_ON_FAIL(vkAllocateCommandBuffers(device, &commandBufferAllocateInfo, &copyCommandBuffer))
+    THROW_ON_FAIL(vkBeginCommandBuffer(copyCommandBuffer, &commandBufferBeginInfo))
+    const VkBufferCopy additionalDataCopy = {
+            0,
+            0,
+            size
+    };
+    vkCmdCopyBuffer(copyCommandBuffer, stagingBuffer, additionalDataBuffer, 1, &additionalDataCopy);
+    THROW_ON_FAIL(vkEndCommandBuffer(copyCommandBuffer))
+
+    VkSubmitInfo submitInfo = {
+            VK_STRUCTURE_TYPE_SUBMIT_INFO,
+            nullptr,
+            0,
+            nullptr,
+            nullptr,
+            1,
+            &copyCommandBuffer,
+            0,
+            nullptr
+    };
+
+    THROW_ON_FAIL(vkQueueSubmit(queue, 1, &submitInfo, nullptr))
+    THROW_ON_FAIL(vkQueueWaitIdle(queue))
 }

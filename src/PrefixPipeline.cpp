@@ -116,3 +116,5 @@ void PrefixPipeline::createDescriptorSet(std::vector<VkBuffer> buffers, VkDescri
     vkUpdateDescriptorSets(device, 3, writeDescriptorSet, 0, nullptr);
 
 }
+
+PrefixPipeline::PrefixPipeline() {}

@@ -12,6 +12,7 @@
 
 class GatherPipeline : public Pipeline {
 public:
+    GatherPipeline();
 
     void createDescriptorSet(std::vector<VkBuffer> buffers, VkDescriptorPool descriptorPool) override;
 

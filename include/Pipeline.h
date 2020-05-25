@@ -12,6 +12,8 @@
 
 class Pipeline {
 public:
+    Pipeline();
+
     void create();
 
     [[nodiscard]] VkPipeline getPipeline() const;

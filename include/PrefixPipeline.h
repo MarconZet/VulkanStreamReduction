@@ -10,6 +10,8 @@
 
 class PrefixPipeline : public Pipeline {
 public:
+    PrefixPipeline();
+
     PrefixPipeline(std::vector<uint32_t> shader , VkDevice device)
     : Pipeline(std::move(shader), device){}
 
