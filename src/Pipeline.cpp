@@ -12,10 +12,10 @@
 #include "Pipeline.h"
 
 void Pipeline::create(){
-    shaderModule = createShaderModule();
-    descriptorSetLayout = createDescriptorSetLayout();
-    pipelineLayout = createPipelineLayout();
-    pipeline = createPipeline();
+    createShaderModule();
+    createDescriptorSetLayout();
+    createPipelineLayout();
+    createPipeline();
 }
 
 VkShaderModule Pipeline::createShaderModule() {
@@ -72,12 +72,13 @@ VkPipeline Pipeline::getPipeline() const {
     return pipeline;
 }
 
-VkPipelineLayout Pipeline::getPipelineLayout() const {
-    return pipelineLayout;
-}
+Pipeline::Pipeline() {}
+
 
 VkDescriptorSet Pipeline::getDescriptorSet() const {
     return descriptorSet;
 }
 
-Pipeline::Pipeline() {}
+VkPipelineLayout Pipeline::getPipelineLayout() const {
+    return pipelineLayout;
+}

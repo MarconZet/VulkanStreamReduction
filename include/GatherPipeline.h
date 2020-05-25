@@ -14,7 +14,7 @@ class GatherPipeline : public Pipeline {
 public:
     GatherPipeline();
 
-    void createDescriptorSet(std::vector<VkBuffer> buffers, VkDescriptorPool descriptorPool) override;
+    void createDescriptorSet(const std::vector<VkBuffer> &buffers, VkDescriptorPool descriptorPool) override;
 
     GatherPipeline(std::vector<uint32_t> shader, VkDevice device)
             : Pipeline(std::move(shader), device) {}

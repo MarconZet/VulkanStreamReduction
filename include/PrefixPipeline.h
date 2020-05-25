@@ -15,7 +15,7 @@ public:
     PrefixPipeline(std::vector<uint32_t> shader , VkDevice device)
     : Pipeline(std::move(shader), device){}
 
-    void createDescriptorSet(std::vector<VkBuffer> buffers, VkDescriptorPool descriptorPool) override;
+    void createDescriptorSet(const std::vector<VkBuffer> &buffers, VkDescriptorPool descriptorPool) override;
 
 protected:
     VkDescriptorSetLayout createDescriptorSetLayout() override;

@@ -12,24 +12,29 @@
 
 class Shader {
 public:
-    Shader(uint32_t elementSize, std::vector<uint32_t> scatterShader, std::vector<uint8_t> data);
 
-    Shader(uint32_t elementSize, const std::string& scatterName, std::vector<uint8_t> data);
+    Shader(uint32_t elementSize, const std::string &scatterName, uint32_t outputElementSize, uint32_t *additionalData,
+           uint32_t additionalDataSize);
 
     std::vector<uint32_t> getShader(const std::string& name);
 
-    [[nodiscard]] uint32_t getElementSize() const;
+    [[nodiscard]] uint32_t getInputElementSize() const;
 
-    [[nodiscard]] const std::vector<uint32_t> &getScatterShader() const;
+    [[nodiscard]] uint32_t getOutputElementSize() const;
 
-    void setData(const std::vector<uint8_t> &data);
+    [[nodiscard]] const std::vector<uint32_t> &getMapShader() const;
 
-    [[nodiscard]] const std::vector<uint8_t> &getAdditionalData() const;
+    uint32_t *getAdditionalData() const;
+
+    uint32_t getAdditionalDataSize() const;
+
 
 private:
-    uint32_t elementSize;
-    std::vector<uint32_t> scatterShader;
-    std::vector<uint8_t> additionalData;
+    uint32_t inputElementSize;
+    uint32_t outputElementSize;
+    std::vector<uint32_t> mapShader;
+    uint32_t * additionalData;
+    uint32_t  additionalDataSize;
 };
 
 

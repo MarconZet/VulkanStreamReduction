@@ -8,16 +8,6 @@
 
 #include "Shader.h"
 
-Shader::Shader(uint32_t elementSize, std::vector<uint32_t> scatterShader, std::vector<uint8_t> data)
-               : elementSize(elementSize), scatterShader(std::move(scatterShader)), additionalData(std::move(data)) {}
-
-uint32_t Shader::getElementSize() const {
-    return elementSize;
-}
-
-const std::vector<uint32_t> &Shader::getScatterShader() const {
-    return scatterShader;
-}
 
 std::vector<uint32_t> Shader::getShader(const std::string& name){
     std::ifstream shaderFile(name, std::ios::binary | std::ios::ate);
@@ -32,18 +22,29 @@ std::vector<uint32_t> Shader::getShader(const std::string& name){
     return shader;
 }
 
-Shader::Shader(uint32_t elementSize, const std::string& scatterName, std::vector<uint8_t> data)
-: elementSize(elementSize), additionalData(std::move(data)){
-    scatterShader = getShader(scatterName);
-    if(elementSize % 4 != 0){
-        throw std::invalid_argument("Element size must be a multiplicative of 4\n");
-    }
+Shader::Shader(uint32_t elementSize, const std::string &scatterName, uint32_t outputElementSize,
+               uint32_t *additionalData,
+               uint32_t additionalDataSize)
+: inputElementSize(elementSize), additionalData(additionalData), outputElementSize(outputElementSize), additionalDataSize(additionalDataSize) {
+    mapShader = getShader(scatterName);
 }
 
-void Shader::setData(const std::vector<uint8_t> &data) {
-    Shader::additionalData = data;
+uint32_t Shader::getInputElementSize() const {
+    return inputElementSize;
 }
 
-const std::vector<uint8_t> &Shader::getAdditionalData() const {
+uint32_t Shader::getOutputElementSize() const {
+    return outputElementSize;
+}
+
+const std::vector<uint32_t> &Shader::getMapShader() const {
+    return mapShader;
+}
+
+uint32_t *Shader::getAdditionalData() const {
     return additionalData;
+}
+
+uint32_t Shader::getAdditionalDataSize() const {
+    return additionalDataSize;
 }

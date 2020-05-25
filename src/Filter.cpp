@@ -12,35 +12,32 @@
 #include "Filter.h"
 
 #include "common.h"
-#include <ScatterPipeline.h>
+#include <MapPipeline.h>
 #include <GatherPipeline.h>
 #include <PrefixPipeline.h>
 
 void Filter::init() {
-    auto prefixShader = shader.getShader("prefix.spv");
-    auto gatherShader = shader.getShader("gather.spv");
-    auto scatterShader = shader.getScatterShader();
+    auto mapShader = shader.getMapShader();
 
-    scatterPipeline = ScatterPipeline(scatterShader, device);
-    prefixPipeline = PrefixPipeline(gatherShader, device);
-    gatherPipeline = GatherPipeline(gatherShader, device);
-
-
-
+    mapPipeline = MapPipeline(mapShader, device);
+    mapPipeline.create();
 
     //Memory Allocation
-    const std::vector<uint8_t> additionalData = shader.getAdditionalData();
+    const uint32_t* additionalData = shader.getAdditionalData();
+
 
     VkPhysicalDeviceMemoryProperties properties;
 
     vkGetPhysicalDeviceMemoryProperties(physicalDevice, &properties);
 
-    const VkDeviceSize dataBufferSize = shader.getElementSize() * elementNumber;
-    const VkDeviceSize prefixBufferSize = elementNumber * 4;
-    const VkDeviceSize algorithmDataBufferSize = 3 * 4;
+    const VkDeviceSize inputBufferSize = shader.getInputElementSize() * 4 * elementNumber;
+    const VkDeviceSize outputBufferSize = shader.getOutputElementSize() * 4 * elementNumber;
 
-    const VkDeviceSize transferMemorySize = dataBufferSize + algorithmDataBufferSize + additionalData.size();
-    const VkDeviceSize localMemorySize = 2 * dataBufferSize + prefixBufferSize;
+    const VkDeviceSize stagingBufferSize = std::max(inputBufferSize, outputBufferSize);
+    const uint32_t additionalDataSize = shader.getAdditionalDataSize() * 4;
+
+    const VkDeviceSize transferMemorySize = stagingBufferSize + additionalDataSize *2;
+    const VkDeviceSize localMemorySize = inputBufferSize + outputBufferSize;
 
     uint32_t transferMemoryIndex = VK_MAX_MEMORY_TYPES;
     uint32_t localMemoryIndex = VK_MAX_MEMORY_TYPES;
@@ -52,6 +49,8 @@ void Filter::init() {
             transferMemoryIndex = k;
             break;
         }
+    }
+    for (uint32_t k = 0; k < properties.memoryTypeCount; k++) {
         if ((VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT & properties.memoryTypes[k].propertyFlags) &&
             (localMemorySize < properties.memoryHeaps[properties.memoryTypes[k].heapIndex].size)) {
             localMemoryIndex = k;
@@ -84,32 +83,28 @@ void Filter::init() {
     const auto dst = VK_BUFFER_USAGE_TRANSFER_DST_BIT;
     const auto src = VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
 
-    inputBuffer = createBuffer(dst, dataBufferSize, localMemory, 0);
-    outputBuffer = createBuffer(src, dataBufferSize, localMemory, dataBufferSize);
-    prefixBuffer = createBuffer(0, prefixBufferSize, localMemory, 2 * dataBufferSize);
+    inputBuffer = createBuffer(dst, inputBufferSize, localMemory, 0);
+    outputBuffer = createBuffer(src, outputBufferSize, localMemory, inputBufferSize);
 
-    stagingBuffer = createBuffer(src | dst, dataBufferSize, transferMemory, 0);
-    additionalDataBuffer = createBuffer(dst, additionalData.size(), transferMemory, dataBufferSize);
-    algorithmDataBuffer = createBuffer(0, algorithmDataBufferSize, transferMemory,
-                                       dataBufferSize + additionalData.size());
+    stagingBuffer = createBuffer(src | dst, stagingBufferSize, transferMemory, 0);
+    additionalDataBuffer = createBuffer(dst, additionalDataSize, transferMemory, stagingBufferSize);
+
+    void *pointer;
+    THROW_ON_FAIL(vkMapMemory(device, transferMemory, stagingBufferSize, additionalDataSize, 0, &pointer))
+    memcpy(pointer, additionalData, additionalDataSize);
+    vkUnmapMemory(device, transferMemory);
 
     //Descriptor set allocation
 
-    std::vector<VkBuffer> buffers(6);
+    std::vector<VkBuffer> buffers;
     buffers.push_back(inputBuffer);
     buffers.push_back(outputBuffer);
-    buffers.push_back(prefixBuffer);
-    buffers.push_back(stagingBuffer);
     buffers.push_back(additionalDataBuffer);
-    buffers.push_back(algorithmDataBuffer);
+    buffers.push_back(stagingBuffer);
 
-    scatterPipeline.createDescriptorSet(buffers, descriptorPool);
-    gatherPipeline.createDescriptorSet(buffers, descriptorPool);
-    prefixPipeline.createDescriptorSet(buffers, descriptorPool);
-
+    mapPipeline.createDescriptorSet(buffers, descriptorPool);
 
     //Command buffer recording
-
 
     VkCommandBufferAllocateInfo commandBufferAllocateInfo = {
             VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
@@ -133,7 +128,7 @@ void Filter::init() {
     const VkBufferCopy bufferCopy = {
             0,
             0,
-            VK_WHOLE_SIZE
+            inputBufferSize
     };
     vkCmdCopyBuffer(commandBuffer, stagingBuffer, inputBuffer, 1, &bufferCopy);
 
@@ -146,7 +141,7 @@ void Filter::init() {
 
     vkCmdPipelineBarrier(
             commandBuffer,
-            VK_PIPELINE_STAGE_FLAG_BITS_MAX_ENUM,
+            VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
             VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
             0,
             1,
@@ -157,12 +152,12 @@ void Filter::init() {
             nullptr
     );
 
-    auto set = scatterPipeline.getDescriptorSet();
-    vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, scatterPipeline.getPipeline());
+    auto set = mapPipeline.getDescriptorSet();
+    vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, mapPipeline.getPipeline());
     vkCmdBindDescriptorSets(
             commandBuffer,
             VK_PIPELINE_BIND_POINT_COMPUTE,
-            scatterPipeline.getPipelineLayout(),
+            mapPipeline.getPipelineLayout(),
             0,
             1,
             &set,
@@ -171,87 +166,36 @@ void Filter::init() {
     );
     vkCmdDispatch(commandBuffer, elementNumber / 1024, 1, 1);
 
-    set = prefixPipeline.getDescriptorSet();
-    vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, prefixPipeline.getPipeline());
-    vkCmdBindDescriptorSets(
+    vkCmdPipelineBarrier(
             commandBuffer,
-            VK_PIPELINE_BIND_POINT_COMPUTE,
-            prefixPipeline.getPipelineLayout(),
+            VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+            VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
             0,
             1,
-            &set,
+            &memoryBarrier,
+            0,
+            nullptr,
             0,
             nullptr
     );
-    vkCmdDispatch(commandBuffer, elementNumber / 16 * 1024, 1, 1);
 
-    set = gatherPipeline.getDescriptorSet();
-    vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, gatherPipeline.getPipeline());
-    vkCmdBindDescriptorSets(
-            commandBuffer,
-            VK_PIPELINE_BIND_POINT_COMPUTE,
-            gatherPipeline.getPipelineLayout(),
+    const VkBufferCopy outputDataCopy = {
             0,
-            1,
-            &set,
             0,
-            nullptr
-    );
-    vkCmdDispatch(commandBuffer, elementNumber / 1024, 1, 1);
-
+            outputBufferSize
+    };
+    vkCmdCopyBuffer(commandBuffer, outputBuffer, stagingBuffer, 1, &outputDataCopy);
     THROW_ON_FAIL(vkEndCommandBuffer(commandBuffer))
-
-
-    void * pointer;
-    THROW_ON_FAIL(vkMapMemory(device, transferMemory, dataBufferSize, additionalData.size(), 0, &pointer))
-    memcpy(pointer, additionalData.data(), additionalData.size());
-    vkUnmapMemory(device, transferMemory);
-
-    VkCommandBuffer copyCommandBuffer;
-    THROW_ON_FAIL(vkAllocateCommandBuffers(device, &commandBufferAllocateInfo, &copyCommandBuffer))
-    THROW_ON_FAIL(vkBeginCommandBuffer(copyCommandBuffer, &commandBufferBeginInfo))
-    const VkBufferCopy additionalDataCopy = {
-            0,
-            0,
-            additionalData.size()
-    };
-    vkCmdCopyBuffer(copyCommandBuffer, stagingBuffer, additionalDataBuffer, 1, &additionalDataCopy);
-    THROW_ON_FAIL(vkEndCommandBuffer(copyCommandBuffer))
-
-    VkSubmitInfo submitInfo = {
-            VK_STRUCTURE_TYPE_SUBMIT_INFO,
-            nullptr,
-            0,
-            nullptr,
-            nullptr,
-            1,
-            &copyCommandBuffer,
-            0,
-            nullptr
-    };
-
-    THROW_ON_FAIL(vkQueueSubmit(queue, 1, &submitInfo, nullptr))
-    THROW_ON_FAIL(vkQueueWaitIdle(queue))
 }
 
-void Filter::execute(const std::vector<uint8_t>& data) {
-    uint32_t dataBufferSize = shader.getElementSize() * elementNumber;
-
-    if(data.size() != dataBufferSize)
-        throw std::invalid_argument("Invalid number of data");
+void * Filter::execute(const uint32_t *data) {
+    uint32_t inputBufferSize = shader.getInputElementSize() * elementNumber * 4;
+    uint32_t outputBufferSize = shader.getOutputElementSize() * elementNumber * 4;
 
     void *pointer;
-    THROW_ON_FAIL(vkMapMemory(device, transferMemory, 0, dataBufferSize, 0, &pointer))
-    memcpy(pointer, data.data(), data.size());
+    THROW_ON_FAIL(vkMapMemory(device, transferMemory, 0, inputBufferSize, 0, &pointer))
+    memcpy(pointer, data, inputBufferSize);
     vkUnmapMemory(device, transferMemory);
-
-    uint32_t *algorithmDataPointer;
-    THROW_ON_FAIL(vkMapMemory(device, transferMemory, dataBufferSize + shader.getAdditionalData().size(), 3 * 4, 0,(void **) &algorithmDataPointer))
-    algorithmDataPointer[0] = elementNumber;
-    algorithmDataPointer[1] = 0;
-    algorithmDataPointer[2] = shader.getElementSize()/4;
-    vkUnmapMemory(device, transferMemory);
-
 
     VkSubmitInfo submitInfo = {
             VK_STRUCTURE_TYPE_SUBMIT_INFO,
@@ -268,15 +212,13 @@ void Filter::execute(const std::vector<uint8_t>& data) {
     THROW_ON_FAIL(vkQueueWaitIdle(queue))
 
 
-    THROW_ON_FAIL(vkMapMemory(device, transferMemory, dataBufferSize + shader.getAdditionalData().size(), 3 * 4, 0,(void **) &algorithmDataPointer))
-    uint32_t outputLength = algorithmDataPointer[1];
+
+    THROW_ON_FAIL(vkMapMemory(device, transferMemory, 0, outputBufferSize, 0, (void **) &pointer))
+    void * result = calloc(outputBufferSize, 1);
+    memcpy(result, pointer, outputBufferSize);
     vkUnmapMemory(device, transferMemory);
 
-    copyCommandBuffer(stagingBuffer, outputBuffer, outputLength);
-
-    THROW_ON_FAIL(vkMapMemory(device, transferMemory, 0, outputLength*shader.getElementSize(), 0, &pointer));
-    
-    vkUnmapMemory(device, transferMemory);
+    return result;
 }
 
 void Filter::unpack(VulkanContext context) {
@@ -289,8 +231,8 @@ void Filter::unpack(VulkanContext context) {
 }
 
 Filter::Filter(uint32_t elementNumber, Shader shader, VulkanContext vulkanContext)
-: elementNumber(elementNumber), shader(std::move(shader)) {
-    if(elementNumber % 16 * 1024 != 0)
+        : elementNumber(elementNumber), shader(std::move(shader)) {
+    if (elementNumber % 16 * 1024 != 0)
         throw std::invalid_argument("Invalid number of elements");
     unpack(vulkanContext);
     init();
@@ -316,47 +258,4 @@ Filter::createBuffer(VkFlags flags, VkDeviceSize size, VkDeviceMemory memory, Vk
     THROW_ON_FAIL(vkBindBufferMemory(device, buffer, memory, memoryOffset))
 
     return buffer;
-}
-
-void Filter::copyCommandBuffer(VkBuffer dst, VkBuffer src, VkDeviceSize size) {
-    const VkCommandBufferAllocateInfo commandBufferAllocateInfo = {
-            VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
-            nullptr,
-            commandPool,
-            VK_COMMAND_BUFFER_LEVEL_PRIMARY,
-            1
-    };
-
-    const VkCommandBufferBeginInfo commandBufferBeginInfo = {
-            VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
-            nullptr,
-            VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT,
-            nullptr
-    };
-
-    VkCommandBuffer copyCommandBuffer;
-    THROW_ON_FAIL(vkAllocateCommandBuffers(device, &commandBufferAllocateInfo, &copyCommandBuffer))
-    THROW_ON_FAIL(vkBeginCommandBuffer(copyCommandBuffer, &commandBufferBeginInfo))
-    const VkBufferCopy additionalDataCopy = {
-            0,
-            0,
-            size
-    };
-    vkCmdCopyBuffer(copyCommandBuffer, stagingBuffer, additionalDataBuffer, 1, &additionalDataCopy);
-    THROW_ON_FAIL(vkEndCommandBuffer(copyCommandBuffer))
-
-    VkSubmitInfo submitInfo = {
-            VK_STRUCTURE_TYPE_SUBMIT_INFO,
-            nullptr,
-            0,
-            nullptr,
-            nullptr,
-            1,
-            &copyCommandBuffer,
-            0,
-            nullptr
-    };
-
-    THROW_ON_FAIL(vkQueueSubmit(queue, 1, &submitInfo, nullptr))
-    THROW_ON_FAIL(vkQueueWaitIdle(queue))
 }

@@ -49,12 +49,8 @@ void main() {
 
     bool isInTriangle = false;
     for (int i = 0; i<TRIANGLE_N; i++){
-        isInTriangle = isInTriangle || is_inside(data_buf[i], in_buf[global_xi]);
-
-        if (subsubgroupAll(isInTriangle)){
-            break;
-        }
+        isInTriangle = isInTriangle || isInside(data_buf[i], in_buf[global_xi]);
     }
 
-    out_buf[global_xi] = isInTriangle;
+    out_buf[global_xi] = int(isInTriangle);
 }

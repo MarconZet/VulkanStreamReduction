@@ -1,1 +1,1 @@
-"$Env:VULKAN_SDK\Bin\glslangValidator.exe -V copy.comp -o copy.spv" | Invoke-Expression
+"$Env:VULKAN_SDK\Bin\glslangValidator.exe -V map2.comp -o comp.spv" | Invoke-Expression

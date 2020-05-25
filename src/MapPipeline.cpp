@@ -5,9 +5,9 @@
 
 
 #include <common.h>
-#include "ScatterPipeline.h"
+#include "MapPipeline.h"
 
-VkDescriptorSetLayout ScatterPipeline::createDescriptorSetLayout() {
+VkDescriptorSetLayout MapPipeline::createDescriptorSetLayout() {
     VkDescriptorSetLayoutBinding descriptorSetLayoutBindings[3] = {
             {
                     0,
@@ -45,7 +45,7 @@ VkDescriptorSetLayout ScatterPipeline::createDescriptorSetLayout() {
     return descriptorSetLayout;
 }
 
-void ScatterPipeline::createDescriptorSet(std::vector<VkBuffer> buffers, VkDescriptorPool descriptorPool) {
+void MapPipeline::createDescriptorSet(const std::vector<VkBuffer> &buffers, VkDescriptorPool descriptorPool) {
     VkDescriptorSetAllocateInfo descriptorSetAllocateInfo = {
             VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO,
             nullptr,
@@ -59,17 +59,17 @@ void ScatterPipeline::createDescriptorSet(std::vector<VkBuffer> buffers, VkDescr
 
     VkDescriptorBufferInfo descriptorBufferInfos[3] = {
             {
-                    buffers[4],
+                    buffers[2],
                     0,
                     VK_WHOLE_SIZE
             },
             {
-                buffers[0],
-                        0,
-                        VK_WHOLE_SIZE
+                    buffers[0],
+                    0,
+                    VK_WHOLE_SIZE
             },
             {
-                    buffers[2],
+                    buffers[1],
                     0,
                     VK_WHOLE_SIZE
             }
@@ -101,20 +101,20 @@ void ScatterPipeline::createDescriptorSet(std::vector<VkBuffer> buffers, VkDescr
                     nullptr
             },
             {
-                VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-                        nullptr,
-                        descriptorSet,
-                        2,
-                        0,
-                        1,
-                        VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
-                        nullptr,
-                        &descriptorBufferInfos[2],
-                        nullptr
+                    VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+                    nullptr,
+                    descriptorSet,
+                    2,
+                    0,
+                    1,
+                    VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+                    nullptr,
+                    &descriptorBufferInfos[2],
+                    nullptr
             }
     };
 
     vkUpdateDescriptorSets(device, 3, writeDescriptorSet, 0, nullptr);
 }
 
-ScatterPipeline::ScatterPipeline() {}
+MapPipeline::MapPipeline() = default;

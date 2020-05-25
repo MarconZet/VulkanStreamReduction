@@ -11,3 +11,5 @@ target_include_directories(VulkanStreamReduce PUBLIC include)
 
 find_package(Vulkan REQUIRED FATAL_ERROR)
 target_link_libraries(VulkanStreamReduce Vulkan::Vulkan)
+
+set(CMAKE_CXX_FLAGS "-O0")

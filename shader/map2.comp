@@ -1,0 +1,32 @@
+#version 450
+
+#extension GL_KHR_shader_subgroup_vote: enable
+
+layout(local_size_x = 1024) in;
+
+struct Triangle{
+    vec2 points[3];
+} triangle;
+
+#define TRIANGLE_N 10
+
+layout(set = 0, binding = 0) readonly buffer DataBuffer {
+    Triangle[] data_buf;
+};
+
+layout(set = 0, binding = 1) readonly buffer InBuffer {
+    vec2[] in_buf;
+};
+
+layout(set = 0, binding = 2) buffer OutBuffer {
+    uint[] out_buf;
+};
+
+
+void main() {
+    uint global_xi = gl_GlobalInvocationID.x;
+
+    bool minim = in_buf[global_xi].x < in_buf[global_xi].y;
+
+    out_buf[global_xi] = int(minim);
+}

@@ -12,7 +12,7 @@
 #include "VulkanContext.h"
 #include "Shader.h"
 #include "Pipeline.h"
-#include <ScatterPipeline.h>
+#include <MapPipeline.h>
 #include <GatherPipeline.h>
 #include <PrefixPipeline.h>
 
@@ -20,8 +20,7 @@ class Filter {
 public:
 
     Filter(uint32_t elementNumber, Shader shader, VulkanContext vulkanContext);
-
-    void execute(const std::vector<uint8_t>& data);
+    void * execute(const uint32_t *data);
 
 private:
     uint32_t elementNumber;
@@ -31,18 +30,14 @@ private:
 
     VkBuffer inputBuffer;
     VkBuffer outputBuffer;
-    VkBuffer prefixBuffer;
 
     VkBuffer stagingBuffer;
     VkBuffer additionalDataBuffer;
-    VkBuffer algorithmDataBuffer;
 
     VkDeviceMemory localMemory;
     VkDeviceMemory transferMemory;
 
-    ScatterPipeline scatterPipeline;
-    GatherPipeline gatherPipeline;
-    PrefixPipeline prefixPipeline;
+    MapPipeline mapPipeline;
 
     VkPhysicalDevice physicalDevice;
     VkDevice device;
@@ -53,7 +48,6 @@ private:
 
     void unpack(VulkanContext context);
     VkBuffer createBuffer(VkFlags flags, VkDeviceSize size, VkDeviceMemory memory, VkDeviceSize memoryOffset);
-    void copyCommandBuffer(VkBuffer dst, VkBuffer src, VkDeviceSize size);
     void init();
 };
 
