@@ -9,18 +9,16 @@
 
 #include "vulkan/vulkan.h"
 
-#include "VulkanContext.h"
-#include "Shader.h"
-#include "Pipeline.h"
+#include <VulkanContext.h>
+#include <Shader.h>
+#include <Pipeline.h>
 #include <MapPipeline.h>
-#include <GatherPipeline.h>
-#include <PrefixPipeline.h>
 
 class Filter {
 public:
 
     Filter(uint32_t elementNumber, Shader shader, VulkanContext vulkanContext);
-    void * execute(const uint32_t *data);
+    void * execute(const void *data);
 
 private:
     uint32_t elementNumber;

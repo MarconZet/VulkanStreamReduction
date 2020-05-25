@@ -11,10 +11,8 @@
 
 #include "Filter.h"
 
-#include "common.h"
+#include <common.h>
 #include <MapPipeline.h>
-#include <GatherPipeline.h>
-#include <PrefixPipeline.h>
 
 void Filter::init() {
     auto mapShader = shader.getMapShader();
@@ -23,7 +21,7 @@ void Filter::init() {
     mapPipeline.create();
 
     //Memory Allocation
-    const uint32_t* additionalData = shader.getAdditionalData();
+    const void* additionalData = shader.getAdditionalData();
 
 
     VkPhysicalDeviceMemoryProperties properties;
@@ -34,9 +32,9 @@ void Filter::init() {
     const VkDeviceSize outputBufferSize = shader.getOutputElementSize() * 4 * elementNumber;
 
     const VkDeviceSize stagingBufferSize = std::max(inputBufferSize, outputBufferSize);
-    const uint32_t additionalDataSize = shader.getAdditionalDataSize() * 4;
+    const uint32_t additionalDataSize = std::max(shader.getAdditionalDataSize() * 4,(uint32_t) 256);
 
-    const VkDeviceSize transferMemorySize = stagingBufferSize + additionalDataSize *2;
+    const VkDeviceSize transferMemorySize = stagingBufferSize + additionalDataSize;
     const VkDeviceSize localMemorySize = inputBufferSize + outputBufferSize;
 
     uint32_t transferMemoryIndex = VK_MAX_MEMORY_TYPES;
@@ -188,7 +186,7 @@ void Filter::init() {
     THROW_ON_FAIL(vkEndCommandBuffer(commandBuffer))
 }
 
-void * Filter::execute(const uint32_t *data) {
+void * Filter::execute(const void *data) {
     uint32_t inputBufferSize = shader.getInputElementSize() * elementNumber * 4;
     uint32_t outputBufferSize = shader.getOutputElementSize() * elementNumber * 4;
 

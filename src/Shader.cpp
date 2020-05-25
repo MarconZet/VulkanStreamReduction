@@ -23,7 +23,7 @@ std::vector<uint32_t> Shader::getShader(const std::string& name){
 }
 
 Shader::Shader(uint32_t elementSize, const std::string &scatterName, uint32_t outputElementSize,
-               uint32_t *additionalData,
+               void *additionalData,
                uint32_t additionalDataSize)
 : inputElementSize(elementSize), additionalData(additionalData), outputElementSize(outputElementSize), additionalDataSize(additionalDataSize) {
     mapShader = getShader(scatterName);
@@ -41,7 +41,7 @@ const std::vector<uint32_t> &Shader::getMapShader() const {
     return mapShader;
 }
 
-uint32_t *Shader::getAdditionalData() const {
+void *Shader::getAdditionalData() const {
     return additionalData;
 }
 
